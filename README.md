@@ -3,6 +3,8 @@
 //Используемые библиотеки (запустите в терминале):
 pip install pygame, pathlib, numpy
 
+// появились скриншоты в папке screenshots
+
 Здесь два главных модуля:
 	- rating.py
 	- Chess_mode.py
