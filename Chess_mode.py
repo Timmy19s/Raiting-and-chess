@@ -49,6 +49,22 @@ class Figs():
     # запись анализа
     rec = False
     
+    # рука
+    with open(f'{Path.cwd()}\data\cursors\hand_figure.txt','br') as file:
+        cursor2 = pygame.cursors.compile(load(file))
+    with open(f'{Path.cwd()}\data\cursors\hand_empty.txt','br') as file:
+        cursor1 = pygame.cursors.compile(load(file))
+        pygame.mouse.set_cursor((24, 24), (12, 12), *cursor1) 
+        
+    # съеденные фигуры
+    eatten_figs = {'p' : [0,0],
+                   'q' : [0,0],
+                   'g' : [0,0],
+                   'h' : [0,0],
+                   'r' : [0,0]}
+    score_game = [0]
+
+    
     def __init__(self,name,location):
         '''
         name - Cn (Color name) \n
@@ -610,6 +626,15 @@ def update_data():
     # поле с фигурами
     Figs.field_fig = array([array([None for i in range(8)]) for i in range(8)])
     
+    # счет
+    # съеденные фигуры
+    Figs.eatten_figs = {'p' : [0,0],
+                   'q' : [0,0],
+                   'g' : [0,0],
+                   'h' : [0,0],
+                   'r' : [0,0]}
+    Figs.score_game = [0]
+    
     # армии
     Figs.my_troops = []
     Figs.animy_troops = []
@@ -670,34 +695,34 @@ def analysis_board():
             
             weight += -1*w if name[0] == color[0] else w
     
-    # шах и мат моему королю
-    if turn != color[0]: # ход ИИ
-        # мой король
-        King = Figs.my_troops[0]
+    # шах и мат королю
+    # мой король
+    King = second_group[0]
 
-        # допустимые ходы
-        av_cells = []
-        King.set_aur()
-        for i in King.aur:
-            x,y = i
-            if (Figs.field_fig[y,x] == None or Figs.field_fig[y,x].name[0] != color[0]) and Figs.territory[1][y,x] == 0:
-                av_cells.append(i)
+    # допустимые ходы
+    av_cells = []
+    King.set_aur()
+    j = 1 if second_group == Figs.my_troops else 0
+    for i in King.aur:
+        x,y = i
+        if (Figs.field_fig[y,x] == None or Figs.field_fig[y,x].name[0] != color[0]) and Figs.territory[j][y,x] == 0:
+            av_cells.append(i)
 
-        k = 8 - len(av_cells) # коэффициент награды
+    k = 8 - len(av_cells) # коэффициент награды
+    g = 0 if j == 1 else 1
+    # есть ли фигура под ударом
+    for cell in King.aur: 
+        x,y = cell
+        
 
-        # есть ли фигура под ударом
-        for cell in King.aur: 
-            x,y = cell
-            
+        # ищу фигуры под ударом #! нужно доработать
+        if Figs.field_fig[y,x] != None and Figs.field_fig[y,x] in first_group and Figs.territory[g][y,x] != 0: # агрессор под ударом
 
-            # ищу фигуры под ударом
-            if Figs.field_fig[y,x] != None and Figs.field_fig[y,x].name[0] != color[0] and Figs.territory[0][y,x] != 0: # фигура ИИ под ударом
+            # если 1 атака, но у ИИ фигура не защищена, или больше одной атаки
+            if Figs.territory[g][y,x] == 1 and Figs.territory[j][y,x] == 0 or Figs.territory[j][y,x] > 1:
+                k -= price[Figs.field_fig[y,x].name[1]] // 10
 
-                # если 1 атака, но у ИИ фигура не защищена, или больше одной атаки
-                if Figs.territory[0][y,x] == 1 and Figs.territory[1][y,x] == 0 or Figs.territory[0][y,x] > 1:
-                    k -= price[Figs.field_fig[y,x].name[1]] // 10
-
-        if Figs.territory[1][King.y, King.x] != 0: # поставлен шах
+        if Figs.territory[j][King.y, King.x] != 0: # поставлен шах
             w = 200 if len(av_cells) == 0 else (10*k - AI.num_Check * 100) # очки за поля
         else:
             w = 5*k
@@ -806,8 +831,12 @@ def moveFig():
     def do(): # исполнить
         global turn
         
-        # удаляю фигуру из списка врагов
+        # удаляю съеденную фигуру из списка врагов и добавляю в список съеденных фигур
         if Figs.field_fig[yNew,xNew] != None:
+            if Figs.field_fig[yNew,xNew].name[0] == color[0]: # моя фигура
+                Figs.eatten_figs[Figs.field_fig[yNew,xNew].name[1]][1] += 1
+            else:
+                Figs.eatten_figs[Figs.field_fig[yNew,xNew].name[1]][0] += 1
             fig.animy.pop(fig.animy.index(Figs.field_fig[yNew,xNew]))
             
         # сдвинуть фигуру
@@ -841,6 +870,11 @@ def moveFig():
             update_chess()
             level_up(fig.y)
         
+        
+        # итог хода
+        Figs.score_game.append(-1 * int(analysis_board())) 
+        
+        
         # ход другого игрока
         turn = 'W' if turn == 'B' else 'B'
         
@@ -867,6 +901,8 @@ def moveFig():
             AI.num_Check += 2
         elif turn == color[0]:
             AI.num_Check -= 1 if AI.num_Check > 0 else 0
+        
+
         
 
     def level_up(h): # пешка становится фигурой
@@ -1101,7 +1137,7 @@ def draw_message(mes):
     pygame.display.flip()
     
     # убрать сообщение
-    set_cycle('space')
+    set_cycle('return')
     
 def draw_timer():
     # создать шрифт
@@ -1181,6 +1217,7 @@ def highlighter(cells = None, col = None):
         y = NumToInd(score[1])
         sc.blit(surf,(560+x*85,y*85))
         
+        draw_av_cells()
         if len(score)> 2: # 2 поле хайлайтер
             x2 = LetToInd(score[2])
             y2 = NumToInd(score[3])
@@ -1188,14 +1225,15 @@ def highlighter(cells = None, col = None):
             if (x2,y2) not in Figs.field_fig[y,x].get_av_cells():
                 surf.fill((255,0,0))
                 score = score[:2]
+                pygame.mouse.set_cursor((24, 24), (12, 12), *Figs.cursor2) # меняю курсор на перемещение
             else:
                 surf.fill((0,255,0)) 
+                pygame.mouse.set_cursor((24, 24), (12, 12), *Figs.cursor1) # меняю курсор на выделение
             
             
             sc.blit(surf,(560+x2*85,y2*85))
-            
-        if len(score) == 2: # доступные клетки
-            draw_av_cells()
+        
+
         
     # шах
     if Figs.check != False:
@@ -1245,29 +1283,66 @@ def draw_av_cells():
 
 def draw_end():
     # создать шрифт
-    font = pygame.font.SysFont('Gabriola',100)
+    font = pygame.font.SysFont('Gabriola',80)
     
     # полотно
     surf = load_img('chess','end')
     
     # Результат
     fin = {'win' : 'Победа',
-            'defeat' : 'Поражение',
-            'stalemate' : 'Ничья'}[end]
+           'defeat' : 'Поражение',
+           'stalemate' : 'Ничья'}[end]
         
     # нарисовать результат
-    fin = font.render(fin,True,(0,0,0))
-    surf.blit(fin,fin.get_rect(center = (300,100)))
+    names = ['Вы',AI.name] if end != 'defeat' else [AI.name,'Вы']
+    
+    
+    draw_img('chess','end_background',sc)
+    fin = font.render(fin,True,(255,255,255))
+    sc.blit(fin,fin.get_rect(center = (640,50)))
+    
+    # таблица
+    yi = 266
+    for name in names:
+        k = 0 if name == 'Вы' else 1
+        name = font.render(name,True,(255,255,255))
+        sc.blit(name,name.get_rect(center = (305,yi)))
         
-    draw_img('chess','background',sc)
-    sc.blit(surf,(340, 260))
+
+        # съеденные фигуры
+        xi = 469
+        for n, fig in Figs.eatten_figs.items():
+            fig = font.render(str(fig[k]),True,(255,255,255))
+            sc.blit(fig,fig.get_rect(center = (xi,yi)))
+            xi += 135
+        yi += 94
+    
+    # график
+    lenth_xi = 858//(len(Figs.score_game)-1)
+    max_y = max(Figs.score_game) if max(Figs.score_game) != 0 else 1
+    min_y = min(Figs.score_game) * (-1) if min(Figs.score_game) != 0 else 1
+    xi = 219
+    yi = 566
+    for i in range(len(Figs.score_game)):
+        start_pos = (xi,yi)
+        xi = 219 + (i)*lenth_xi
+        # получаю yi
+        len_y =  max_y if Figs.score_game[i] >0 else min_y
+        print(Figs.score_game[i])
+        
+        yi = 566 - (Figs.score_game[i])*130//len_y
+        end_pos = (xi,yi)
+        pygame.draw.line(sc,(255,242,0),start_pos,end_pos,5)
+        
+        
+    
+    # sc.blit(surf,(340, 260))
     pygame.display.flip()
     
     set_cycle('escape')
     draw_img('chess','background',sc)
     pygame.display.flip() 
-  
-  
+
   
 # ввод
 def mouse(but): # ввод через мышку
@@ -1305,13 +1380,15 @@ def mouse(but): # ввод через мышку
             # выбрать фигуру
             if Figs.field_fig[y,x] in Figs.my_troops:
                 score = LN
+                pygame.mouse.set_cursor((24, 24), (12, 12), *Figs.cursor2)
             
             elif len(score) == 2: # передвинуть фигуру
                 if Figs.field_fig[y,x] in Figs.animy_troops or Figs.field_fig[y,x] == None:
-                    score += LN
+                    score += LN 
             
             elif len(score) == 4: # поменять область, куда будет сдвинута фигрура 
                 score = score[:2] + LN
+            
             
             # обновить
             update_chess()
@@ -1607,7 +1684,6 @@ def Regular_game():
     global mode, ex, turn, end
     Figs.castling = True
     editor()
-    # AI.set_AI('Robot') #! ставлю робота 
     
     # случай блитз
     AI.low_time()
@@ -1624,8 +1700,7 @@ def Regular_game():
 
     # прогружаю доску
     update_chess()
-    
-                   
+
     # игра
     Run.update()
     t = 0
@@ -1636,10 +1711,10 @@ def Regular_game():
         # ходит ИИ
         if color[0] != turn:
             AI.makeMove()
-        
-                
+                 
         else: # хожу я 
             but = get_but_mouse()
+            
             if but != None:
                 if but== 'escape':
                     break
@@ -1886,6 +1961,9 @@ def main():
             
             elif but =='5':
                 AI.blitz = True if AI.blitz == False else False
+            
+            elif but =='9':
+                Test_game()
 
             elif but == 'escape':
                 break    
